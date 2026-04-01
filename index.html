@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Viral Quote Generator</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: #fff; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { text-align: center; margin-bottom: 30px; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; margin-bottom: 8px; font-weight: bold; }
+    input, select, textarea, button { width: 100%; padding: 12px; border: 2px solid #fff; border-radius: 8px; background: rgba(255,255,255,0.1); color: #fff; font-size: 16px; }
+    textarea { min-height: 100px; }
+    button { background: #fff; color: #667eea; border: none; font-weight: bold; cursor: pointer; margin-top: 10px; }
+    button:disabled { opacity: 0.6; }
+    .output { margin-top: 30px; background: rgba(255,255,255,0.1); border-radius: 10px; padding: 20px; display: none; }
+    .score { font-size: 48px; font-weight: bold; text-align: center; }
+    .version { background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px; margin: 10px 0; cursor: pointer; }
+    .image-preview { margin-top: 20px; text-align: center; }
+    .image-preview img { max-width: 100%; border-radius: 10px; }
+    .loading { text-align: center; padding: 20px; display: none; }
+    .spinner { border: 4px solid #fff; border-top: 4px solid transparent; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 15px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>✨ Viral Quote Generator</h1>
+    <div class="form-group">
+      <label>Your Quote:</label>
+      <textarea id="quote" placeholder="Enter your original quote..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Platform:</label>
+      <select id="platform">
+        <option value="facebook">Facebook</option>
+        <option value="instagram">Instagram</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Style:</label>
+      <select id="style">
+        <option value="minimalist">Minimalist</option>
+        <option value="motivational">Motivational</option>
+        <option value="luxury">Luxury</option>
+        <option value="street">Street</option>
+        <option value="nature">Nature</option>
+      </select>
+    </div>
+    <button id="analyzeBtn" onclick="analyzeQuote()">Analyze & Improve 🔍</button>
+    <button id="generateBtn" onclick="generateImage()" style="display:none;">Generate Image 🎨</button>
+    <div class="loading" id="loading"><div class="spinner"></div><p id="loadingText">Working...</p></div>
+    <div class="output" id="output">
+      <h3>📊 Viral Score:</h3><div class="score" id="viralScore"></div>
+      <h3 style="margin-top:20px;">✅ Strengths:</h3><ul id="strengths"></ul>
+      <h3 style="margin-top:20px;">⚠️ Weaknesses:</h3><ul id="weaknesses"></ul>
+      <h3 style="margin-top:20px;">🔥 Improved Versions:</h3><div id="versions"></div>
+      <h3 style="margin-top:20px;">📱 Best Platform:</h3><p id="bestPlatform"></p>
+      <h3 style="margin-top:20px;">⏰ Best Time:</h3><p id="bestTime"></p>
+      <h3 style="margin-top:20px;">🏷️ Hashtags:</h3><p id="hashtags"></p>
+      <div class="image-preview" id="imagePreview"></div>
+    </div>
+  </div>
+  <script>
+    let selectedQuote = '';
+    async function analyzeQuote() {
+      const quote = document.getElementById('quote').value;
+      const platform = document.getElementById('platform').value;
+      const style = document.getElementById('style').value;
+      if (!quote || quote.trim().length < 5) { alert('Enter at least 5 characters'); return; }
+      document.getElementById('analyzeBtn').disabled = true;
+      document.getElementById('loading').style.display = 'block';
+      try {
+        const res = await fetch('/api/analyze-quote', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quote, platform, style })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        const a = data.analysis;
+        document.getElementById('viralScore').textContent = a.viralScore + '/10';
+        document.getElementById('viralScore').style.color = a.viralScore >= 7 ? '#4ade80' : a.viralScore >= 5 ? '#fbbf24' : '#f87171';
+        document.getElementById('strengths').innerHTML = a.strengths.map(s => `<li>${s}</li>`).join('');
+        document.getElementById('weaknesses').innerHTML = a.weaknesses.map(w => `<li>${w}</li>`).join('');
+        document.getElementById('versions').innerHTML = a.improvedVersions.map((v,i) => 
+          `<div class="version" onclick="selectVersion('${v.quote.replace(/'/g,"\\'")}')"><strong>V${i+1}:</strong><p>${v.quote}</p><small><em>${v.why}</em></small></div>`
+        ).join('');
+        document.getElementById('bestPlatform').textContent = a.bestPlatform;
+        document.getElementById('bestTime').textContent = a.bestPostingTime;
+        document.getElementById('hashtags').textContent = a.hashtags.join(' ');
+        selectedQuote = a.improvedVersions[0].quote;
+        document.getElementById('generateBtn').style.display = 'block';
+        document.getElementById('output').style.display = 'block';
+      } catch (e) { alert('Error: ' + e.message); }
+      finally { document.getElementById('analyzeBtn').disabled = false; document.getElementById('loading').style.display = 'none'; }
+    }
+    function selectVersion(q) { selectedQuote = q; document.getElementById('quote').value = q; alert('Selected! Now tap Generate Image.'); }
+    async function generateImage() {
+      const style = document.getElementById('style').value;
+      const platform = document.getElementById('platform').value;
+      if (!selectedQuote) { alert('Select a version first'); return; }
+      document.getElementById('generateBtn').disabled = true;
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('loadingText').textContent = 'Generating image...';
+      try {
+        const res = await fetch('/api/generate-image', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ quote: selectedQuote, style, platform })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        document.getElementById('imagePreview').innerHTML = `<h3>🎨 Your Image:</h3><img src="${data.imageUrl}"><br><br><a href="${data.imageUrl}" download="viral-quote.png" style="background:#4ade80;color:#000;padding:10px 20px;text-decoration:none;border-radius:5px;">Download 📥</a>`;
+      } catch (e) { alert('Error: ' + e.message); }
+      finally { document.getElementById('generateBtn').disabled = false; document.getElementById('loading').style.display = 'none'; }
+    }
+  </script>
+</body>
+</html>
